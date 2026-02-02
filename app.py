@@ -9,14 +9,14 @@ raw_token = st.secrets["HUBSPOT_TOKEN"].strip()
 HEADERS = {"Authorization": f"Bearer {raw_token}", "Content-Type": "application/json"}
 
 st.set_page_config(page_title="High-Volume Dashboard", layout="wide")
-st.title("📈 Full 30-Day Lead Performance")
+st.title("📈 Full 90-Day Lead Performance")
 
 # --- 2. THE BYPASS SYNC (1-Day Chunks) ---
 @st.cache_data(ttl=3600)
 def get_all_leads_unlimited():
     all_contacts = []
     # We iterate day-by-day to reset the 10k search limit for each day
-    for i in range(30):
+    for i in range(90):
         target_day = datetime.now() - timedelta(days=i)
         next_day = target_day + timedelta(days=1)
         
@@ -72,15 +72,15 @@ if raw_data:
     ])
 
     # Build a full 30-day timeline to ensure 0s are shown for empty days
-    all_dates = pd.date_range(start=(datetime.now() - timedelta(days=29)).date(), end=datetime.now().date()).date
+    all_dates = pd.date_range(start=(datetime.now() - timedelta(days=90)).date(), end=datetime.now().date()).date
     daily_counts = df.groupby('Date').size().reindex(all_dates, fill_value=0)
 
     # --- 4. VISUALS (CLEAN MODE) ---
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.metric("Total Lead Volume (30 Days)", f"{len(df):,}")
+        st.metric("Total Lead Volume (90 Days)", f"{len(df):,}")
     with col2:
-        st.metric("Daily Avg", round(len(df)/30, 1))
+        st.metric("Daily Avg", round(len(df)/90, 1))
 
     st.subheader("Signup Velocity (No Limits)")
     st.line_chart(daily_counts, color="#29b5e8")
