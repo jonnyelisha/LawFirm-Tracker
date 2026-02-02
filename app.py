@@ -17,19 +17,30 @@ st.markdown("---")
 # --- 2. DATA FETCHING ---
 @st.cache_data(ttl=600)
 def get_hubspot_data():
-    lookback_days = 14
+    # Widening lookback to 30 days just to TEST if data exists
+    lookback_days = 30 
     start_timestamp = int((datetime.now() - timedelta(days=lookback_days)).timestamp() * 1000)
     url = "https://api.hubapi.com/crm/v3/objects/contacts/search"
     
     payload = {
         "filterGroups": [{
-            "filters": [{"propertyName": "createdate", "operator": "GTE", "value": start_timestamp}]
+            "filters": [{
+                "propertyName": "createdate",
+                "operator": "GTE",
+                "value": str(start_timestamp) # HubSpot sometimes prefers string values for timestamps
+            }]
         }],
-        "properties": ["createdate", "firstname",'lastname', "email"],
+        "properties": ["createdate", "firstname", "lastname", "email"],
         "sorts": [{"propertyName": "createdate", "direction": "DESCENDING"}]
     }
     
     response = requests.post(url, headers=HEADERS, json=payload)
+    
+    # DEBUG: See the raw response if it's failing
+    if response.status_code != 200:
+        st.error(f"HubSpot API Error: {response.status_code} - {response.text}")
+        return []
+        
     return response.json().get('results', [])
 
 # --- 3. PROCESSING & GRAPHING ---
@@ -39,37 +50,40 @@ if results:
     data_list = []
     for r in results:
         p = r['properties']
-        # FIX: We convert to datetime but DON'T strip the time with .date()
-        # We use .strftime to make it look clean: Year-Month-Day Hour:Min:Sec
-        raw_time = pd.to_datetime(p['createdate'])
+        raw_time = pd.to_datetime(p.get('createdate'))
         formatted_time = raw_time.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # FIXED: Correct way to get First and Last name
+        fname = p.get('firstname', '')
+        lname = p.get('lastname', '')
+        full_name = f"{fname} {lname}".strip() or "Unknown"
         
         data_list.append({
             "Timestamp": formatted_time,
-            "Date_Only": raw_time.date(), # Keep this for the grouping/chart logic
-            "Name": p.get('firstname','lastname','N/A'),
+            "Date_Only": raw_time.date(),
+            "Name": full_name,
             "Email": p.get('email', 'N/A')
         })
+    
     df = pd.DataFrame(data_list)
 
-    # Grouping logic for the chart (still uses Date_Only to keep the graph clean)
+    # Grouping logic
     daily_counts = df.groupby('Date_Only').size().reset_index(name='Signups')
     daily_counts = daily_counts.set_index('Date_Only')
 
     # Visualizing
     col1, col2 = st.columns([3, 1])
-    
     with col1:
         st.subheader("Signup Trend")
         st.line_chart(daily_counts, color="#29b5e8")
-
     with col2:
-        st.metric("Total (14 Days)", len(df))
-        st.metric("Daily Avg", round(len(df)/14, 1))
+        st.metric("Total (30 Days)", len(df))
+        st.metric("Daily Avg", round(len(df)/30, 1))
 
-    # Recent Activity Table (Now showing Timestamp with Hour/Min/Sec)
     st.subheader("Recent Signups (Exact Time)")
-    # We display the columns we want, including the new Timestamp
-    st.dataframe(df[["Timestamp", "Name", "Email"]].head(20), use_container_width=True)
+    st.dataframe(df[["Timestamp", "Name", "Email"]], use_container_width=True)
 else:
-    st.warning("No signups found in the specified timeframe.")
+    st.warning("⚠️ No signups found. This could mean the token is valid but has no 'Contact' permissions, or the filter is too restrictive.")
+    if st.button("Check Connection Status"):
+        st.write("Attempting to reach HubSpot...")
+        st.write(f"Timestamp used: {int((datetime.now() - timedelta(days=30)).timestamp() * 1000)}")
