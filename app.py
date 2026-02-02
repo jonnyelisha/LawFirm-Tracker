@@ -72,15 +72,27 @@ if results:
     daily_counts = df.groupby('Date').size().reindex(all_dates, fill_value=0)
 
     # --- 4. VISUALS ---
-    col1, col2 = st.columns([3, 1])
+# --- 4. VISUALS (CLEAN VERSION) ---
+    # Top Row: Big Metrics
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.subheader("Signup Trend (Full Month)")
-        st.line_chart(daily_counts, color="#29b5e8")
+        st.metric("Total Signups (30 Days)", f"{len(df):,}")
     with col2:
-        st.metric("Total Signups", len(df))
-        st.metric("Daily Avg", round(len(df)/30, 1))
+        st.metric("Daily Average", round(len(df)/30, 1))
+    with col3:
+        # Calculate growth compared to the first half of the month
+        mid_point = datetime.now().date() - timedelta(days=15)
+        recent_half = len(df[df['Date'] > mid_point])
+        st.metric("Last 15 Days", recent_half)
 
-    st.subheader("All Signups (Newest First)")
-    st.dataframe(df[["Timestamp", "Name", "Email"]], use_container_width=True)
-else:
-    st.info("No signups found in the specified timeframe.")
+    st.markdown("---")
+
+    # Middle: The Graph (The Main Focus)
+    st.subheader("Signup Velocity Trend")
+    st.line_chart(daily_counts, color="#29b5e8")
+
+    # Bottom: Collapsible "Verification" Data
+    # We hide the 10,000 rows inside an "expander" so they don't take up space
+    with st.expander("🔍 View Raw Data Sample (Recent 50 Leads)"):
+        st.write("Showing only the most recent 50 leads for verification.")
+        st.dataframe(df[["Timestamp", "Name", "Email"]].head(50), use_container_width=True)
