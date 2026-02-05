@@ -9,7 +9,7 @@ raw_token = st.secrets["HUBSPOT_TOKEN"].strip()
 HEADERS = {"Authorization": f"Bearer {raw_token}", "Content-Type": "application/json"}
 
 st.set_page_config(page_title="High-Volume Dashboard", layout="wide")
-st.title("📈 Full 90-Day Lead Performance")
+st.title("📈 CPLG Full 90-Day Lead Performance")
 
 # --- 2. THE BYPASS SYNC (1-Day Chunks) ---
 @st.cache_data(ttl=3600)
